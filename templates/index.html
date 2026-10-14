@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simulador de Pila</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <main class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8">
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h1 class="h5 mb-0">Simulador de Pila</h1>
+                    </div>
+
+                    <div class="card-body">
+                        <div id="alerta" class="alert alert-info d-none" role="alert"></div>
+
+                        <section class="mb-4">
+                            <h2 class="h6 text-muted">1. Crear pila</h2>
+
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-sm-8">
+                                    <label for="capacidad" class="form-label">Capacidad</label>
+                                    <input type="number" min="1" class="form-control" id="capacidad" placeholder="Ejemplo: 5">
+                                </div>
+
+                                <div class="col-12 col-sm-4">
+                                    <button id="btnCrear" class="btn btn-primary w-100">Crear pila</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="mb-4">
+                            <h2 class="h6 text-muted">2. Operaciones</h2>
+
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-sm-8">
+                                    <label for="valor" class="form-label">Valor a apilar</label>
+                                    <input type="text" class="form-control" id="valor" placeholder="Ejemplo: A, 10, hola">
+                                </div>
+
+                                <div class="col-6 col-sm-4">
+                                    <button id="btnApilar" class="btn btn-success w-100">Apilar</button>
+                                </div>
+
+                                <div class="col-6 col-sm-4">
+                                    <button id="btnDesapilar" class="btn btn-warning w-100">Desapilar</button>
+                                </div>
+
+                                <div class="col-6 col-sm-4">
+                                    <button id="btnTope" class="btn btn-info w-100">Ver tope</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h2 class="h6 text-muted mb-0">Estado de la pila</h2>
+                                <span id="contador" class="badge bg-secondary">0 / 0</span>
+                            </div>
+
+                            <ul id="pila" class="list-group mt-3"></ul>
+                        </section>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const alerta = document.getElementById("alerta");
+        const listaPila = document.getElementById("pila");
+        const contador = document.getElementById("contador");
+
+        function mostrarAlerta(mensaje, tipo = "info") {
+            alerta.className = `alert alert-${tipo}`;
+            alerta.textContent = mensaje;
+            alerta.classList.remove("d-none");
+        }
+
+        function actualizarPila(datos) {
+            listaPila.innerHTML = "";
+
+            if (datos.elementos.length === 0) {
+                const vacio = document.createElement("li");
+                vacio.className = "list-group-item text-center text-muted";
+                vacio.textContent = "La pila está vacía.";
+                listaPila.appendChild(vacio);
+            } else {
+                datos.elementos.forEach((elemento, indice) => {
+                    const item = document.createElement("li");
+                    item.className = "list-group-item d-flex justify-content-between";
+
+                    const texto = document.createElement("span");
+                    texto.textContent = elemento;
+
+                    const etiqueta = document.createElement("span");
+                    etiqueta.className = "badge bg-primary";
+                    etiqueta.textContent = indice === 0 ? "Tope" : `Posición ${indice + 1}`;
+
+                    item.appendChild(texto);
+                    item.appendChild(etiqueta);
+                    listaPila.appendChild(item);
+                });
+            }
+
+            contador.textContent = `${datos.cantidad} / ${datos.capacidad}`;
+        }
+
+        async function enviar(url, metodo = "GET", cuerpo = null) {
+            try {
+                const opciones = { method: metodo };
+
+                if (cuerpo) {
+                    opciones.headers = { "Content-Type": "application/json" };
+                    opciones.body = JSON.stringify(cuerpo);
+                }
+
+                const respuesta = await fetch(url, opciones);
+                const datos = await respuesta.json();
+
+                if (datos.elementos !== undefined) {
+                    actualizarPila(datos);
+                }
+
+                if (datos.exito) {
+                    mostrarAlerta(datos.mensaje || "Operación realizada.", "success");
+                } else {
+                    mostrarAlerta(datos.mensaje || "Ocurrió un error.", "danger");
+                }
+            } catch (error) {
+                mostrarAlerta("No se pudo conectar con el servidor.", "danger");
+            }
+        }
+
+        document.getElementById("btnCrear").addEventListener("click", () => {
+            const capacidad = document.getElementById("capacidad").value;
+            enviar("/api/crear", "POST", { capacidad });
+        });
+
+        document.getElementById("btnApilar").addEventListener("click", () => {
+            const valor = document.getElementById("valor").value;
+            enviar("/api/apilar", "POST", { item: valor });
+        });
+
+        document.getElementById("btnDesapilar").addEventListener("click", () => {
+            enviar("/api/desapilar", "POST");
+        });
+
+        document.getElementById("btnTope").addEventListener("click", () => {
+            enviar("/api/tope", "GET");
+        });
+    </script>
+</body>
+</html>

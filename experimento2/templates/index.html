@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pila de Fotos</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+    <main class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10">
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <h1 class="h5 mb-0">Pila de Fotos con Cámara</h1>
+                    </div>
+
+                    <div class="card-body">
+                        <div id="alerta" class="alert alert-info d-none"></div>
+
+                        <section class="mb-4">
+                            <h2 class="h6 text-muted">1. Crear pila</h2>
+
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-sm-8">
+                                    <label for="capacidad" class="form-label">
+                                        Cantidad máxima de fotos
+                                    </label>
+                                    <input type="number" min="1" class="form-control" id="capacidad"
+                                        placeholder="Ejemplo: 5">
+                                </div>
+
+                                <div class="col-12 col-sm-4">
+                                    <button id="btnCrear" class="btn btn-primary w-100">Crear pila</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="mb-4">
+                            <h2 class="h6 text-muted">2. Cámara</h2>
+
+                            <div class="row g-3">
+                                <div class="col-12 col-md-7">
+                                    <video id="video" class="w-100 bg-black rounded" autoplay playsinline></video>
+                                </div>
+
+                                <div class="col-12 col-md-5">
+                                    <canvas id="canvas" class="d-none"></canvas>
+                                    <img id="preview" class="w-100 bg-secondary rounded d-none" alt="Vista previa">
+
+                                    <div class="d-grid gap-2 mt-3">
+                                        <button id="btnIniciar" class="btn btn-outline-primary">Iniciar cámara</button>
+                                        <button id="btnCapturar" class="btn btn-success" disabled>Tomar foto y
+                                            apilar</button>
+                                        <button id="btnDetener" class="btn btn-outline-danger" disabled>Detener
+                                            cámara</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="mb-4">
+                            <h2 class="h6 text-muted">3. Operaciones</h2>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <button id="btnDesapilar" class="btn btn-warning w-100">Desapilar última
+                                        foto</button>
+                                </div>
+
+                                <div class="col-6">
+                                    <button id="btnTope" class="btn btn-info w-100">Ver foto del tope</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h2 class="h6 text-muted mb-0">Fotos en la pila</h2>
+                                <span id="contador" class="badge bg-secondary">0 / 0</span>
+                            </div>
+
+                            <div id="pila" class="d-flex flex-column align-items-center mt-4"></div>
+                        </section>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const preview = document.getElementById("preview");
+        const alerta = document.getElementById("alerta");
+        const contenedorPila = document.getElementById("pila");
+        const contador = document.getElementById("contador");
+
+        const btnIniciar = document.getElementById("btnIniciar");
+        const btnCapturar = document.getElementById("btnCapturar");
+        const btnDetener = document.getElementById("btnDetener");
+        const btnCrear = document.getElementById("btnCrear");
+        const btnDesapilar = document.getElementById("btnDesapilar");
+        const btnTope = document.getElementById("btnTope");
+
+        let stream = null;
+
+        function mostrarAlerta(mensaje, tipo = "info") {
+            alerta.className = `alert alert-${tipo}`;
+            alerta.textContent = mensaje;
+            alerta.classList.remove("d-none");
+        }
+
+        function actualizarPila(datos) {
+            contenedorPila.innerHTML = "";
+
+            if (!datos.elementos || datos.elementos.length === 0) {
+                contenedorPila.innerHTML = `
+            <div class="alert alert-secondary w-100 text-center">
+                La pila está vacía.
+            </div>
+        `;
+                return;
+            }
+
+            datos.elementos.forEach((nombre, indice) => {
+                const tarjeta = document.createElement("div");
+                tarjeta.className = "card shadow";
+                tarjeta.style.width = "260px";
+
+                if (indice > 0) {
+                    tarjeta.style.marginTop = "-180px";
+                }
+
+                tarjeta.style.zIndex = String(100 - indice);
+                tarjeta.style.position = "relative";
+
+                tarjeta.innerHTML = `
+            <img src="/foto/${nombre}" class="card-img-top" alt="Foto apilada">
+            <div class="card-body p-2 text-center">
+                <span class="badge ${indice === 0 ? "bg-success" : "bg-secondary"}">
+                    ${indice === 0 ? "Tope" : `Foto ${indice + 1}`}
+                </span>
+            </div>
+        `;
+
+                contenedorPila.appendChild(tarjeta);
+            });
+
+            contador.textContent = `${datos.cantidad} / ${datos.capacidad}`;
+        }
+
+        async function iniciarCamara() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+
+                video.srcObject = stream;
+                btnCapturar.disabled = false;
+                btnDetener.disabled = false;
+                btnIniciar.disabled = true;
+
+                mostrarAlerta("Cámara iniciada.", "success");
+            } catch (error) {
+                mostrarAlerta("No se pudo acceder a la cámara. Revisa los permisos.", "danger");
+            }
+        }
+
+        function detenerCamara() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                stream = null;
+            }
+
+            btnCapturar.disabled = true;
+            btnDetener.disabled = true;
+            btnIniciar.disabled = false;
+
+            mostrarAlerta("Cámara detenida.", "secondary");
+        }
+
+        function capturarFoto() {
+            if (!stream) {
+                mostrarAlerta("Primero inicia la cámara.", "warning");
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const contexto = canvas.getContext("2d");
+            contexto.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imagen = canvas.toDataURL("image/jpeg", 0.9);
+
+            preview.src = imagen;
+            preview.classList.remove("d-none");
+
+            return imagen;
+        }
+
+        async function enviar(url, metodo = "GET", cuerpo = null) {
+            try {
+                const opciones = { method: metodo };
+
+                if (cuerpo) {
+                    opciones.headers = { "Content-Type": "application/json" };
+                    opciones.body = JSON.stringify(cuerpo);
+                }
+
+                const respuesta = await fetch(url, opciones);
+                const datos = await respuesta.json();
+
+                if (datos.elementos !== undefined) {
+                    actualizarPila(datos);
+                }
+
+                if (datos.exito) {
+                    mostrarAlerta(datos.mensaje, "success");
+                } else {
+                    mostrarAlerta(datos.mensaje, "danger");
+                }
+            } catch (error) {
+                mostrarAlerta("Error de conexión con el servidor.", "danger");
+            }
+        }
+
+        btnIniciar.addEventListener("click", iniciarCamara);
+        btnDetener.addEventListener("click", detenerCamara);
+
+        btnCrear.addEventListener("click", () => {
+            const capacidad = document.getElementById("capacidad").value;
+            enviar("/api/crear", "POST", { capacidad });
+        });
+
+        btnCapturar.addEventListener("click", () => {
+            const imagen = capturarFoto();
+
+            if (imagen) {
+                enviar("/api/capturar", "POST", { imagen });
+            }
+        });
+
+        btnDesapilar.addEventListener("click", () => {
+            enviar("/api/desapilar", "POST");
+        });
+
+        btnTope.addEventListener("click", () => {
+            enviar("/api/tope", "GET");
+        });
+    </script>
+</body>
+
+</html>
